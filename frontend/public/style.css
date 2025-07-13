@@ -8,8 +8,8 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
-    color: #333;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: rgb(54, 8, 66);
+    background: linear-gradient(135deg, #521852 0%, #764ba2 100%);
     min-height: 100vh;
 }
 
@@ -51,12 +51,12 @@ header p {
     color: #333;
     margin-bottom: 25px;
     font-size: 1.8rem;
-    border-bottom: 3px solid #667eea;
+    border-bottom: 3px solid rgb(143, 64, 162);
     padding-bottom: 10px;
 }
 
 .job-form {
-    display: grid;
+    display:grid;
     gap: 20px;
 }
 
@@ -91,7 +91,7 @@ header p {
 .form-group select:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: #667eea;
+    border-color:  rgb(143, 64, 162);
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
@@ -116,7 +116,7 @@ header p {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background:  rgb(143, 64, 162);
     color: white;
 }
 
@@ -167,7 +167,7 @@ header p {
     color: #333;
     margin-bottom: 25px;
     font-size: 1.8rem;
-    border-bottom: 3px solid #667eea;
+    border-bottom: 3px solid  rgb(143, 64, 162);;
     padding-bottom: 10px;
 }
 
@@ -194,7 +194,7 @@ header p {
 
 .stat-icon {
     font-size: 2rem;
-    color: #667eea;
+    color:  rgb(143, 64, 162);;
 }
 
 .stat-info h3 {
@@ -231,7 +231,7 @@ header p {
 .jobs-header h2 {
     color: #333;
     font-size: 1.8rem;
-    border-bottom: 3px solid #667eea;
+    border-bottom: 3px solid  rgb(143, 64, 162);
     padding-bottom: 10px;
 }
 
@@ -252,7 +252,7 @@ header p {
 .filter-controls select:focus,
 .filter-controls input:focus {
     outline: none;
-    border-color: #667eea;
+    border-color:  rgb(143, 64, 162);;
 }
 
 /* Jobs List */
