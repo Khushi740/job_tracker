@@ -1,14 +1,23 @@
 class JobTracker {
     constructor() {
-        this.jobs = JSON.parse(localStorage.getItem('jobs')) || [];
+        this.jobs = [];
         this.currentEditId = null;
+        this.apiUrl = 'http://localhost:5000/api';
+        this.user = null;
+        this.token = localStorage.getItem('token');
         this.init();
     }
 
-    init() {
+    async init() {
         this.bindEvents();
-        this.renderJobs();
-        this.updateStatistics();
+
+        if (this.token) {
+            await this.loadUserProfile();
+            await this.loadJobs();
+        } else {
+            this.renderJobs();
+            this.updateStatistics();
+        }
     }
 
     bindEvents() {
@@ -51,81 +60,178 @@ class JobTracker {
         });
     }
 
-    addJob() {
+    // API Helper Method
+    async apiCall(endpoint, options = {}) {
+        const url = `${this.apiUrl}${endpoint}`;
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...(this.token && { Authorization: `Bearer ${this.token}` })
+            },
+            ...options
+        };
+
+        try {
+            const response = await fetch(url, config);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'API request failed');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+
+    // Load User Profile
+    async loadUserProfile() {
+        try {
+            const data = await this.apiCall('/auth/me');
+            this.user = data.user;
+            this.updateUserUI();
+        } catch (error) {
+            console.error('Failed to load user profile:', error);
+            this.logout();
+        }
+    }
+
+    // Load Jobs from Backend
+    async loadJobs() {
+        try {
+            const data = await this.apiCall('/jobs');
+            this.jobs = data.jobs || [];
+            this.renderJobs();
+            this.updateStatistics();
+        } catch (error) {
+            console.error('Failed to load jobs:', error);
+            this.showNotification('Failed to load jobs', 'error');
+        }
+    }
+
+    // Add Job (with Backend API)
+    async addJob() {
+        if (!this.token) {
+            this.showNotification('Please log in to add jobs', 'warning');
+            return;
+        }
+
         const formData = new FormData(document.getElementById('jobForm'));
-        const job = {
-            id: Date.now().toString(),
+        const jobData = {
             company: formData.get('company'),
             position: formData.get('position'),
             status: formData.get('status'),
             dateApplied: formData.get('dateApplied'),
-            salary: formData.get('salary') || '',
-            location: formData.get('location') || '',
-            jobUrl: formData.get('jobUrl') || '',
-            notes: formData.get('notes') || '',
-            dateAdded: new Date().toISOString()
+            salary: formData.get('salary') ? Number(formData.get('salary')) : undefined,
+            location: formData.get('location') || undefined,
+            jobUrl: formData.get('jobUrl') || undefined,
+            notes: formData.get('notes') || undefined
         };
 
-        this.jobs.push(job);
-        this.saveJobs();
-        this.renderJobs();
-        this.updateStatistics();
-        this.resetForm();
-        this.showNotification('Job application added successfully!', 'success');
+        try {
+            const data = await this.apiCall('/jobs', {
+                method: 'POST',
+                body: JSON.stringify(jobData)
+            });
+
+            this.jobs.push(data.job);
+            this.renderJobs();
+            this.updateStatistics();
+            this.resetForm();
+            this.showNotification('Job application added successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to add job:', error);
+            this.showNotification('Failed to add job application', 'error');
+        }
     }
 
-    updateJob() {
+    // Update Job (with Backend API)
+    async updateJob() {
+        if (!this.token) {
+            this.showNotification('Please log in to update jobs', 'warning');
+            return;
+        }
+
         const formData = new FormData(document.getElementById('editJobForm'));
         const jobId = document.getElementById('editJobId').value;
         
-        const jobIndex = this.jobs.findIndex(job => job.id === jobId);
-        if (jobIndex !== -1) {
-            this.jobs[jobIndex] = {
-                ...this.jobs[jobIndex],
-                company: formData.get('company'),
-                position: formData.get('position'),
-                status: formData.get('status'),
-                dateApplied: formData.get('dateApplied'),
-                salary: formData.get('salary') || '',
-                location: formData.get('location') || '',
-                jobUrl: formData.get('jobUrl') || '',
-                notes: formData.get('notes') || ''
-            };
+        const jobData = {
+            company: formData.get('company'),
+            position: formData.get('position'),
+            status: formData.get('status'),
+            dateApplied: formData.get('dateApplied'),
+            salary: formData.get('salary') ? Number(formData.get('salary')) : undefined,
+            location: formData.get('location') || undefined,
+            jobUrl: formData.get('jobUrl') || undefined,
+            notes: formData.get('notes') || undefined
+        };
 
-            this.saveJobs();
+        try {
+            const data = await this.apiCall(`/jobs/${jobId}`, {
+                method: 'PUT',
+                body: JSON.stringify(jobData)
+            });
+
+            const jobIndex = this.jobs.findIndex(job => job._id === jobId);
+            if (jobIndex !== -1) {
+                this.jobs[jobIndex] = data.job;
+            }
+
             this.renderJobs();
             this.updateStatistics();
             this.closeModal();
             this.showNotification('Job application updated successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to update job:', error);
+            this.showNotification('Failed to update job application', 'error');
         }
     }
 
+    // Edit Job
     editJob(jobId) {
-        const job = this.jobs.find(job => job.id === jobId);
+        const job = this.jobs.find(job => job._id === jobId);
         if (!job) return;
 
         // Populate edit form
-        document.getElementById('editJobId').value = job.id;
+        document.getElementById('editJobId').value = job._id;
         document.getElementById('editCompany').value = job.company;
         document.getElementById('editPosition').value = job.position;
         document.getElementById('editStatus').value = job.status;
-        document.getElementById('editDateApplied').value = job.dateApplied;
-        document.getElementById('editSalary').value = job.salary;
-        document.getElementById('editLocation').value = job.location;
-        document.getElementById('editJobUrl').value = job.jobUrl;
-        document.getElementById('editNotes').value = job.notes;
+        document.getElementById('editDateApplied').value = job.dateApplied.split('T')[0];
+        document.getElementById('editSalary').value = job.salary || '';
+        document.getElementById('editLocation').value = job.location || '';
+        document.getElementById('editJobUrl').value = job.jobUrl || '';
+        document.getElementById('editNotes').value = job.notes || '';
 
         // Show modal
         document.getElementById('editModal').style.display = 'block';
     }
 
-    deleteJob(jobId) {
-        if (confirm('Are you sure you want to delete this job application?')) {
-            this.jobs = this.jobs.filter(job => job.id !== jobId);
-            this.saveJobs();
+    // Delete Job (with Backend API)
+    async deleteJob(jobId) {
+        if (!this.token) {
+            this.showNotification('Please log in to delete jobs', 'warning');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this job application?')) {
+            return;
+        }
+
+        try {
+            await this.apiCall(`/jobs/${jobId}`, {
+                method: 'DELETE'
+            });
+
+            this.jobs = this.jobs.filter(job => job._id !== jobId);
             this.renderJobs();
             this.updateStatistics();
             this.showNotification('Job application deleted successfully!', 'success');
+        } catch (error) {
+            console.error('Failed to delete job:', error);
+            this.showNotification('Failed to delete job application', 'error');
         }
     }
 
@@ -189,6 +295,8 @@ class JobTracker {
             }).format(salary);
         };
 
+        const jobId = job._id || job.id;
+
         return `
             <div class="job-card">
                 <div class="job-header">
@@ -235,10 +343,10 @@ class JobTracker {
                 ` : ''}
                 
                 <div class="job-actions">
-                    <button onclick="jobTracker.editJob('${job.id}')" class="btn btn-edit">
+                    <button onclick="jobTracker.editJob('${jobId}')" class="btn btn-edit">
                         <i class="fas fa-edit"></i> Edit
                     </button>
-                    <button onclick="jobTracker.deleteJob('${job.id}')" class="btn btn-danger">
+                    <button onclick="jobTracker.deleteJob('${jobId}')" class="btn btn-danger">
                         <i class="fas fa-trash"></i> Delete
                     </button>
                 </div>
@@ -260,16 +368,13 @@ class JobTracker {
         document.getElementById('totalRejected').textContent = stats.totalRejected;
     }
 
-    saveJobs() {
-        localStorage.setItem('jobs', JSON.stringify(this.jobs));
-    }
-
     resetForm() {
         document.getElementById('jobForm').reset();
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateApplied').value = today;
     }
 
     showNotification(message, type = 'info') {
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.style.cssText = `
@@ -283,9 +388,9 @@ class JobTracker {
             z-index: 2000;
             transition: all 0.3s ease;
             transform: translateX(100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         `;
 
-        // Set background color based on type
         switch (type) {
             case 'success':
                 notification.style.backgroundColor = '#28a745';
@@ -304,12 +409,10 @@ class JobTracker {
         notification.textContent = message;
         document.body.appendChild(notification);
 
-        // Animate in
         setTimeout(() => {
             notification.style.transform = 'translateX(0)';
         }, 100);
 
-        // Animate out and remove
         setTimeout(() => {
             notification.style.transform = 'translateX(100%)';
             setTimeout(() => {
@@ -318,39 +421,31 @@ class JobTracker {
         }, 3000);
     }
 
-    // Export data to JSON
+    updateUserUI() {
+        if (this.user) {
+            document.querySelector('header p').textContent = `Welcome back, ${this.user.firstName}!`;
+        }
+    }
+
+    logout() {
+        this.token = null;
+        this.user = null;
+        this.jobs = [];
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        this.renderJobs();
+        this.updateStatistics();
+        this.showNotification('Please log in to continue', 'info');
+    }
+
     exportData() {
         const dataStr = JSON.stringify(this.jobs, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-        
         const exportFileDefaultName = `job-applications-${new Date().toISOString().split('T')[0]}.json`;
-        
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', exportFileDefaultName);
         linkElement.click();
-    }
-
-    // Import data from JSON
-    importData(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const importedJobs = JSON.parse(e.target.result);
-                if (Array.isArray(importedJobs)) {
-                    this.jobs = importedJobs;
-                    this.saveJobs();
-                    this.renderJobs();
-                    this.updateStatistics();
-                    this.showNotification('Data imported successfully!', 'success');
-                } else {
-                    this.showNotification('Invalid file format!', 'error');
-                }
-            } catch (error) {
-                this.showNotification('Error importing data!', 'error');
-            }
-        };
-        reader.readAsText(file);
     }
 }
 
@@ -361,7 +456,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Add keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-    // ESC key to close modal
     if (e.key === 'Escape') {
         const modal = document.getElementById('editModal');
         if (modal.style.display === 'block') {
