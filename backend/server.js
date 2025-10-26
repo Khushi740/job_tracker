@@ -41,12 +41,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('combined'));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/jobtracker', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// Removed deprecated options: useNewUrlParser and useUnifiedTopology
+mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://khushisingh74003_db_user:xoVjJhEZ9o7HJGi1@cluster0.rp8xoo7.mongodb.net/?appName=Cluster0', {
+  // These options are now deprecated and removed to clear warnings.
 })
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -72,9 +72,10 @@ app.use((err, req, res, next) => {
 });
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
+
 
 // Start server
 app.listen(PORT, () => {
